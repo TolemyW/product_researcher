@@ -1,0 +1,14 @@
+version: '3.9'
+services:
+  researcher:
+    build: .
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./config:/app/config
+    command: ["python", "-m", "src.cli", "schedule", "--config", "config/schedule.example.json", "--run-once"]

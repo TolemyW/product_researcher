@@ -45,8 +45,11 @@ class ReportBuilderTests(unittest.TestCase):
         self.assertEqual(report.title, "Sample Report")
         self.assertEqual(report.total_documents, 2)
         self.assertSetEqual(set(report.channels), {"docs", "github"})
-        self.assertTrue(any("Channel Breakdown" in line for line in report.markdown.splitlines()))
-        self.assertTrue(any("Key Highlights" in line for line in report.markdown.splitlines()))
+        self.assertTrue(report.strengths)
+        self.assertTrue(report.weaknesses)
+        self.assertTrue(report.comparisons)
+        self.assertTrue(any("渠道分布" in line for line in report.markdown.splitlines()))
+        self.assertTrue(any("关键信息" in line for line in report.markdown.splitlines()))
         self.assertTrue(report.sources)
         self.assertTrue(report.highlights)
 
