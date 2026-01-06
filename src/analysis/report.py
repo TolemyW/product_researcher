@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable, List
 
+from src.analysis.insights import build_comparison_rows, extract_insights
 from src.storage.data_store import NormalizedDocument, RawDocument, Summary
 
 
@@ -15,6 +16,9 @@ class ReportResult:
     total_documents: int
     channels: list[str]
     languages: list[str]
+    strengths: list[str]
+    weaknesses: list[str]
+    comparisons: list[str]
     highlights: list[str]
     sources: list[str]
     markdown: str
@@ -25,7 +29,7 @@ def _format_sources(docs: Iterable[NormalizedDocument], limit: int = 10) -> list
     for doc in docs:
         label = doc.title or doc.url
         channel = doc.channel or "general"
-        items.append(f"- [{label}]({doc.url}) _(channel: {channel})_")
+        items.append(f"- [{label}]({doc.url}) _(渠道: {channel})_")
         if len(items) >= limit:
             break
     return items
@@ -56,43 +60,58 @@ def _fallback_highlights(docs: Iterable[NormalizedDocument], limit: int = 8) -> 
 def build_report(
     documents: List[NormalizedDocument] | List[RawDocument],
     summaries: List[Summary],
-    title: str = "Product Research Report",
+    title: str = "产品研究报告",
     source_limit: int = 10,
+    generated_at: str | None = None,
 ) -> ReportResult:
-    generated_at = datetime.utcnow().isoformat() + "Z"
+    generated_at = generated_at or datetime.utcnow().isoformat() + "Z"
     channel_counts = Counter([getattr(doc, "channel", None) or "general" for doc in documents])
     language_counts = Counter([getattr(doc, "language", None) or "unknown" for doc in documents])
 
     channel_lines = [f"- {name}: {count}" for name, count in sorted(channel_counts.items())]
     language_lines = [f"- {name}: {count}" for name, count in sorted(language_counts.items())]
 
+    insights = extract_insights(summaries, documents)
+    strengths = [f"- {item.text} _(来源: {item.source})_" for item in insights.get("strength", [])]
+    weaknesses = [f"- {item.text} _(来源: {item.source})_" for item in insights.get("weakness", [])]
+
     highlights = _aggregate_highlights(summaries)
     if not highlights:
         highlights = _fallback_highlights(documents)
 
     source_lines = _format_sources(documents, limit=source_limit)
+    comparisons = build_comparison_rows(documents, summaries)
 
     markdown_sections = [
         f"# {title}",
         "",
-        f"_Generated at: {generated_at}_",
+        f"_生成时间：{generated_at}_",
         "",
-        "## Coverage",
-        f"- Total documents: {len(documents)}",
-        f"- Distinct channels: {len(channel_counts)}",
-        f"- Distinct languages: {len(language_counts)}",
+        "## 覆盖范围",
+        f"- 文档总数：{len(documents)}",
+        f"- 渠道数量：{len(channel_counts)}",
+        f"- 语言数量：{len(language_counts)}",
         "",
-        "## Channel Breakdown",
-        *(channel_lines or ["- (none)"]),
+        "## 渠道分布",
+        *(channel_lines or ["- （暂无渠道）"]),
         "",
-        "## Language Breakdown",
-        *(language_lines or ["- (unknown)"]),
+        "## 语言分布",
+        *(language_lines or ["- （未知）"]),
         "",
-        "## Key Highlights",
-        *(highlights or ["- No summaries available"]),
+        "## 关键信息",
+        *(highlights or ["- 暂无摘要可用"]),
         "",
-        "## Sources",
-        *(source_lines or ["- No sources available"]),
+        "## 优势亮点",
+        *(strengths or ["- 暂未识别优势"]),
+        "",
+        "## 风险与不足",
+        *(weaknesses or ["- 暂未识别风险/不足"]),
+        "",
+        "## 对比速览",
+        *(comparisons or ["- 数据不足，无法对比"]),
+        "",
+        "## 来源列表",
+        *(source_lines or ["- 暂无来源"]),
         "",
     ]
 
@@ -103,6 +122,9 @@ def build_report(
         total_documents=len(documents),
         channels=list(channel_counts.keys()),
         languages=list(language_counts.keys()),
+        strengths=strengths,
+        weaknesses=weaknesses,
+        comparisons=comparisons,
         highlights=highlights,
         sources=source_lines,
         markdown=markdown,

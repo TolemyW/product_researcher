@@ -1,0 +1,3 @@
+{"url": "https://example.com/review-1", "title": "产品A 用户评价", "content": "电池续航表现良好，重量稍高", "fetched_at": "2025-02-10T01:00:00Z", "channel": "reviews", "language": "zh", "source": "wechat", "normalized_at": "2025-02-10T02:00:00Z"}
+{"url": "https://example.com/doc-1", "title": "产品A 技术白皮书", "content": "性能稳定，适合企业部署", "fetched_at": "2025-02-10T03:00:00Z", "channel": "docs", "language": "zh", "source": "official", "normalized_at": "2025-02-10T04:00:00Z"}
+{"url": "https://example.com/ecom-1", "title": "产品A 电商页面", "content": "售价低于竞品，性价比优势明显", "fetched_at": "2025-02-10T05:00:00Z", "channel": "ecommerce", "language": "zh", "source": "jd", "normalized_at": "2025-02-10T06:00:00Z"}

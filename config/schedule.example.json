@@ -1,0 +1,28 @@
+{
+  "env_file": ".env",
+  "default_data_dir": "data/scheduled_runs",
+  "default_llm_model": "gpt-4o-mini",
+  "default_use_llm": true,
+  "default_product_type": "consumer",
+  "default_interval_minutes": 120,
+  "log_dir": "logs",
+  "tasks": [
+    {
+      "name": "weekly_comparison",
+      "keywords": ["智能手表", "健康监测"],
+      "keyword_brief": "关注面向运动和健康监测的主流智能手表，覆盖国内外渠道",
+      "urls": ["https://example.com/launches"],
+      "report_output": "data/reports/weekly.md",
+      "report_title": "智能手表市场周报",
+      "interval_minutes": 10080,
+      "concurrency": 4
+    },
+    {
+      "name": "daily_refresh",
+      "keywords": ["AI 生产力软件"],
+      "product_type": "software",
+      "interval_minutes": 1440,
+      "concurrency": 2
+    }
+  ]
+}

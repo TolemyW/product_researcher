@@ -15,19 +15,20 @@
 
 ### 快速上手（MVP）
 1. 安装依赖（目前仅使用标准库，无额外安装）。
-2. 运行发现 + 抓取 + 摘要的端到端流程（会在本地 `data/` 下写入 JSONL 文件）：
+2. 可选：如需启用 LLM 生成关键词/摘要，请在环境中设置 `OPENAI_API_KEY`（支持 `OPENAI_BASE_URL` 自定义兼容端点），并通过 `--use-llm` 或 `--keyword-brief` 触发。
+3. 运行发现 + 抓取 + 摘要的端到端流程（会在本地 `data/` 下写入 JSONL 文件）：
    ```bash
    python -m src.cli pipeline --keywords "新款耳机" --urls https://example.com
    ```
-3. 如果已知 URL，可直接抓取后再摘要（可按需调整抓取策略）：
- ```bash
-  python -m src.cli fetch https://example.com/product --timeout 12 --max-retries 2 --delay 0.5
-  python -m src.cli summarize
-  ```
-4. 仅做来源发现：
+4. 如果已知 URL，可直接抓取后再摘要（可按需调整抓取策略）：
+```bash
+ python -m src.cli fetch https://example.com/product --timeout 12 --max-retries 2 --delay 0.5
+ python -m src.cli summarize
+ ```
+5. 仅做来源发现：
    ```bash
-   # 按产品类型（如 consumer、software、b2b）自动挑选搜索渠道
-   python -m src.cli discover "旗舰手机" "机械键盘" --product-type consumer
+   # 按产品类型（如 consumer、software、b2b）自动挑选搜索渠道，可通过简述让 LLM 生成关键词
+   python -m src.cli discover --keyword-brief "旗舰手机，主打影像与快充" --product-type consumer --llm-model gpt-4o-mini
    ```
 
 5. **阶段 2 新增：清洗与规范化**
@@ -41,11 +42,11 @@
     ```
 
 6. **阶段 3 预览：报告导出**
-   - 基于已清洗/摘要的数据生成 Markdown 报告：
+   - 基于已清洗/摘要的数据生成 Markdown 报告（默认中文模板）：
      ```bash
      python -m src.cli report --data-dir data --output data/report.md --title "企业级产品研究报告"
      ```
-   - 报告中包含渠道与语言分布、摘要要点以及来源列表，便于快速浏览采集结果。
+   - 报告中包含渠道与语言分布、摘要要点、优劣势提炼（基于要点关键词的规则分类）、对比速览以及来源列表，便于在中文语境下快速浏览采集结果。
 
 也可以在端到端流程中指定产品类型，让发现阶段优先使用匹配的渠道：
 
@@ -53,10 +54,44 @@
 python -m src.cli pipeline --keywords "企业级 CRM" --product-type b2b
 ```
 
+如需在 pipeline 中直接启用 LLM 摘要与关键词扩展，可增加：
+
+```bash
+OPENAI_API_KEY=sk-*** python -m src.cli pipeline \
+  --keyword-brief "企业级 CRM，关注中大型客户的部署与集成" \
+  --product-type b2b --use-llm --llm-model gpt-4o-mini
+```
+
 输出文件位于 `data/` 目录：
 - `raw.jsonl`：原始抓取结果（URL、标题、正文、抓取时间）。
 - `normalized.jsonl`：清洗/标准化后的文档（去重、语言标签等）。
 - `summary.jsonl`：要点摘要（对应 URL 的条目、摘要要点、生成时间）。
+
+### 自动化调度与部署（阶段 4）
+1. 复制调度示例配置并按需调整：
+   ```bash
+   cp config/schedule.example.json config/schedule.json
+   ```
+   - 可在 `env_file` 中指定 `.env`，格式为 `KEY=VALUE`，用于注入 `OPENAI_API_KEY` 等敏感信息。
+   - 在 `default_*` 字段设置数据目录、默认产品类型/LLM，`tasks` 内可分别配置关键词、URL、报告导出路径与执行间隔。
+
+2. 一次性或循环调度运行（默认将日志写入 `logs/pipeline.log`）：
+   ```bash
+   python -m src.cli schedule --config config/schedule.json --run-once
+   # 循环 5 轮、每轮间隔 30 秒
+   python -m src.cli schedule --config config/schedule.json --max-cycles 5 --sleep-seconds 30
+   ```
+
+3. Docker/Compose 方式启动（挂载数据、日志与配置目录）：
+   ```bash
+   docker compose up --build
+   # 自定义配置文件
+   docker compose run researcher python -m src.cli schedule --config config/schedule.json --run-once
+   ```
+
+4. 监控与后续告警：
+   - 每次任务结束会在 `logs/pipeline.log` 记录 JSON 行，包含任务名、状态、耗时、报错与生成的报告路径。
+   - 可将日志文件挂载到日志聚合/告警系统，实现失败通知或按耗时监控。
 
 #### 抓取策略与渠道选择
 - **按产品类型自动挑选渠道与抓取策略：**
@@ -107,11 +142,11 @@ python -m src.cli pipeline --keywords "企业级 CRM" --product-type b2b
 - 为分析结果添加可配置的提示词/模板，支持多语言输出。
 - 增加示例数据与快照测试，确保报告格式稳定；更新 README 展示示例报告片段。
 
-### 阶段 4：自动化运行与部署
-- 构建定时/事件驱动的采集调度（如 cron + CLI 或轻量任务队列）。
-- 增加配置管理（env/`config.yml`）与敏感信息加载方式，记录最佳实践。
-- 提供 Dockerfile/Compose，支持一键启动采集与报告生成。
-- 添加监控与告警基础（失败重试、日志聚合），并在 README 增补部署与运维指南。
+### 阶段 4：自动化运行与部署（已落地）
+- 通过 `config/schedule.example.json` 管理任务队列、默认数据目录与 LLM 设置，可搭配 `.env` 注入敏感信息。
+- CLI 新增 `schedule` 命令，支持一次性执行（`--run-once`）或按间隔轮询（`--max-cycles` + `--sleep-seconds`），并将运行结果写入 `logs/pipeline.log`。
+- Dockerfile 与 `docker-compose.yml` 支持一键启动调度流程，默认挂载 `data/`、`logs/`、`config/` 目录。
+- 监控与告警基础：每次任务写入结构化日志（状态、耗时、报错），便于日志聚合或后续接入通知渠道。
 
 ### 阶段 5：性能与质量优化
 - 优化并发抓取与缓存策略，降低重复请求；为关键路径增加性能基准。
